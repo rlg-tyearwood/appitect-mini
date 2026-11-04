@@ -1,0 +1,42 @@
+{
+	email ${acme_email}
+	order coraza_waf first
+}
+
+# Reusable OWASP CRS snippet: Active Blocking Mode
+(coraza_waf_on) {
+	coraza_waf {
+		load_owasp_crs
+		directives `
+			Include @coraza.conf-recommended
+			Include @crs-setup.conf.example
+			Include @owasp_crs/*.conf
+			SecRuleEngine On
+			SecAction "id:900200,phase:1,nolog,pass,t:none,setvar:tx.allowed_methods=GET HEAD POST OPTIONS PUT PATCH DELETE"
+		`
+	}
+}
+
+# Reusable OWASP CRS snippet: Detection-Only Mode (for onboarding/testing new tenant apps safely)
+(coraza_waf_detect) {
+	coraza_waf {
+		load_owasp_crs
+		directives `
+			Include @coraza.conf-recommended
+			Include @crs-setup.conf.example
+			Include @owasp_crs/*.conf
+			SecRuleEngine DetectionOnly
+			SecAction "id:900200,phase:1,nolog,pass,t:none,setvar:tx.allowed_methods=GET HEAD POST OPTIONS PUT PATCH DELETE"
+		`
+	}
+}
+%{ if enable_panel_subdomain && panel_domain != "" ~}
+
+${panel_domain} {
+	encode zstd gzip
+	reverse_proxy host.docker.internal:${panel_port}
+}
+%{ endif ~}
+
+# Import all hosted tenant application site definitions
+import /etc/caddy/sites/*.caddy

@@ -1,0 +1,163 @@
+#cloud-config
+hostname: ${hostname}
+manage_etc_hosts: true
+package_update: true
+package_upgrade: true
+
+packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - ufw
+  - fail2ban
+  - jq
+  - unattended-upgrades
+  - postgresql-client
+
+users:
+  - default
+  - name: deploy
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+    ssh_authorized_keys:
+      - ${ssh_public_key}
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-appitect-hardening.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+      KbdInteractiveAuthentication no
+
+  - path: /etc/sysctl.d/99-appitect-mini-shared.conf
+    owner: root:root
+    permissions: "0644"
+    content: |
+      # Shared multi-app memory & file cache tuning
+      vm.swappiness = 10
+      vm.vfs_cache_pressure = 50
+
+  - path: /etc/docker/daemon.json
+    owner: root:root
+    permissions: "0644"
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        },
+        "live-restore": true,
+        "default-ulimits": {
+          "nofile": {
+            "Name": "nofile",
+            "Hard": 65536,
+            "Soft": 65536
+          }
+        }
+      }
+
+  - path: /etc/cron.weekly/appitect-docker-prune
+    owner: root:root
+    permissions: "0755"
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      # Reclaim unused container images & build cache older than 7 days on shared storage
+      docker image prune -af --filter "until=168h" >/dev/null 2>&1 || true
+      docker builder prune -af --filter "until=168h" >/dev/null 2>&1 || true
+
+  - path: /usr/local/bin/appitect-onboard
+    owner: root:root
+    permissions: "0755"
+    encoding: b64
+    content: ${onboard_script_b64}
+
+  - path: /usr/local/bin/appitect-offboard
+    owner: root:root
+    permissions: "0755"
+    encoding: b64
+    content: ${offboard_script_b64}
+
+  - path: /usr/local/bin/appitect-status
+    owner: root:root
+    permissions: "0755"
+    encoding: b64
+    content: ${status_script_b64}
+
+  - path: /opt/appitect-mini/edge/Dockerfile.caddy
+    owner: root:root
+    permissions: "0644"
+    encoding: b64
+    content: ${dockerfile_caddy_b64}
+
+  - path: /opt/appitect-mini/edge/docker-compose.yml
+    owner: root:root
+    permissions: "0644"
+    encoding: b64
+    content: ${compose_edge_b64}
+
+  - path: /opt/appitect-mini/edge/Caddyfile
+    owner: root:root
+    permissions: "0644"
+    encoding: b64
+    content: ${caddyfile_b64}
+%{ for slug, b64 in tenant_sites_b64 ~}
+
+  - path: /opt/appitect-mini/edge/sites/${slug}.caddy
+    owner: root:root
+    permissions: "0644"
+    encoding: b64
+    content: ${b64}
+%{ endfor ~}
+
+runcmd:
+  - sysctl --system || true
+  - systemctl reload ssh || systemctl reload sshd || true
+  - systemctl enable --now fail2ban
+%{ if swap_size_gb > 0 ~}
+
+  # Provision swapfile for multi-tenant memory spike safety
+  - test -f /swapfile || (fallocate -l ${swap_size_gb}G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile && echo "/swapfile none swap sw 0 0" >> /etc/fstab)
+%{ endif ~}
+
+  # Host Firewall (UFW)
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow OpenSSH
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow 443/udp
+  - ufw --force enable
+
+  # Install Docker Engine & Compose Plugin
+  - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  - sh /tmp/get-docker.sh
+  - rm -f /tmp/get-docker.sh
+  - usermod -aG docker deploy
+  - systemctl enable --now docker
+
+  # Create shared edge network and per-tenant isolated internal networks
+  - docker network inspect vps_edge >/dev/null 2>&1 || docker network create --driver bridge vps_edge
+%{ for net in tenant_network_list ~}
+  - docker network inspect ${net} >/dev/null 2>&1 || docker network create --driver bridge ${net}
+%{ endfor ~}
+
+  # Prepare multi-tenant directories
+  - mkdir -p /opt/apps /opt/appitect-mini/edge/sites
+%{ for slug in tenant_slugs ~}
+  - mkdir -p /opt/apps/${slug}
+%{ endfor ~}
+  - chown -R deploy:deploy /opt/apps /opt/appitect-mini
+
+  # Unattended 1Panel Web UI Installation
+  - curl -fsSL https://resource.1panel.pro/quick_start.sh -o /tmp/install-1panel.sh
+  - PANEL_NON_INTERACTIVE=true PANEL_LANG=en PANEL_INSTALL_DIR=/opt PANEL_PORT=${panel_port} PANEL_ENTRANCE='${panel_entrance}' PANEL_USERNAME='${panel_username}' PANEL_PASSWORD='${panel_password}' PANEL_INSTALL_DOCKER=n PANEL_CONFIGURE_ACCELERATOR=n PANEL_REPLACE_DAEMON_JSON=n bash /tmp/install-1panel.sh
+  - rm -f /tmp/install-1panel.sh
+
+  # Build and launch shared Caddy + Coraza OWASP WAF
+  - docker compose -f /opt/appitect-mini/edge/docker-compose.yml up -d --build

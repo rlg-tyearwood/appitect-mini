@@ -1,0 +1,104 @@
+name: Appitect-Mini Terraform Shared Infrastructure
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: appitect-mini-tf-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: terraform
+
+jobs:
+  validate:
+    name: Format & Validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9.0"
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init (Backend Disabled for Syntax Validation)
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+  plan:
+    name: Terraform Plan (PR)
+    needs: validate
+    if: github.event_name == 'pull_request' && secrets.LINODE_TOKEN != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.TF_STATE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_SECRET_KEY }}
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      TF_VAR_linode_token: ${{ secrets.LINODE_TOKEN }}
+      TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+      TF_VAR_cluster_name: ${{ vars.CLUSTER_NAME || 'shared-01' }}
+      TF_VAR_acme_email: ${{ vars.ACME_EMAIL || 'devops@example.com' }}
+      TF_VAR_hosted_apps: ${{ vars.HOSTED_APPS_JSON || '{}' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9.0"
+
+      - name: Terraform Init (S3-Compatible Remote State)
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ vars.TF_STATE_KEY || format('appitect-mini/{0}/terraform.tfstate', vars.CLUSTER_NAME || 'shared-01') }}" \
+            -backend-config='endpoints={s3="${{ secrets.TF_STATE_ENDPOINT }}"}'
+
+      - name: Terraform Plan
+        run: terraform plan -no-color -input=false
+
+  apply:
+    name: Terraform Apply (Main)
+    needs: validate
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' && secrets.LINODE_TOKEN != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.TF_STATE_ACCESS_KEY }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_SECRET_KEY }}
+      LINODE_TOKEN: ${{ secrets.LINODE_TOKEN }}
+      TF_VAR_linode_token: ${{ secrets.LINODE_TOKEN }}
+      TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+      TF_VAR_cluster_name: ${{ vars.CLUSTER_NAME || 'shared-01' }}
+      TF_VAR_acme_email: ${{ vars.ACME_EMAIL || 'devops@example.com' }}
+      TF_VAR_hosted_apps: ${{ vars.HOSTED_APPS_JSON || '{}' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9.0"
+
+      - name: Terraform Init (S3-Compatible Remote State)
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="key=${{ vars.TF_STATE_KEY || format('appitect-mini/{0}/terraform.tfstate', vars.CLUSTER_NAME || 'shared-01') }}" \
+            -backend-config='endpoints={s3="${{ secrets.TF_STATE_ENDPOINT }}"}'
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false
