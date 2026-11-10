@@ -1,0 +1,20 @@
+# Managed tenant site definition for: ${app_slug}
+${domain} {
+	import ${waf_mode == "On" ? "coraza_waf_on" : "coraza_waf_detect"}
+
+	request_body {
+		max_size ${max_body_mb}MB
+	}
+
+	encode zstd gzip
+
+	log {
+		output file /var/log/caddy/${app_slug}-access.log {
+			roll_size 15MiB
+			roll_keep 4
+		}
+		format json
+	}
+
+	reverse_proxy ${upstream_container}:${upstream_port}
+}

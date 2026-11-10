@@ -1,0 +1,45 @@
+# Reference Docker Compose template for low-usage applications hosted on a shared Appitect-Mini VPS.
+# Replace `medial` with the tenant's `<app_slug>`.
+#
+# Key Shared-Hosting Guardrails:
+# 1. Explicit `mem_limit` and `cpus` caps prevent noisy-neighbor CPU/RAM starvation across sibling apps.
+# 2. Backend APIs attach ONLY to `<app_slug>_internal` (invisible to other tenants on the shared VPS).
+# 3. Frontend/BFF containers bridge `vps_edge` (for Caddy+Coraza WAF) and `<app_slug>_internal`.
+
+services:
+  medialapi:
+    image: ghcr.io/your-org/medialapi:latest
+    container_name: medialapi
+    restart: unless-stopped
+    mem_limit: 384m
+    cpus: 0.50
+    env_file:
+      - .env.api
+    volumes:
+      - api_storage:/app/.storage
+    networks:
+      - medial_internal
+
+  medialapp:
+    image: ghcr.io/your-org/medialapp:latest
+    container_name: medialapp
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.50
+    depends_on:
+      medialapi:
+        condition: service_healthy
+    env_file:
+      - .env.app
+    networks:
+      - vps_edge
+      - medial_internal
+
+networks:
+  vps_edge:
+    external: true
+  medial_internal:
+    external: true
+
+volumes:
+  api_storage:

@@ -1,0 +1,53 @@
+# Copy to terraform.tfvars and populate your values (never commit terraform.tfvars)
+
+linode_token   = "replace-with-linode-personal-access-token"
+cluster_name   = "shared-01"
+environment    = "production"
+linode_region  = "us-east"
+vps_type       = "g6-standard-2" # 4GB RAM / 2 vCPUs (upgrade to g6-standard-4 for 6+ low-usage apps)
+swap_size_gb   = 4               # 4 GiB swapfile prevents OOM kills during multi-app memory spikes
+ssh_public_key = "ssh-ed25519 AAAA... deploy@appitect-mini"
+
+ssh_allowed_ipv4 = ["0.0.0.0/0"]
+ssh_allowed_ipv6 = ["::/0"]
+
+rlg_support_email = "support@yourdomain.com"
+
+# Declarative registry of multiple low-usage applications hosted on this shared VPS
+hosted_apps = {
+  medial = {
+    domain             = "medial.yourdomain.com"
+    upstream_container = "medialapp"
+    upstream_port      = 3000
+    waf_mode           = "On"
+    max_body_mb        = 10
+  }
+  progression = {
+    domain             = "progression.yourdomain.com"
+    upstream_container = "progression-app"
+    upstream_port      = 3000
+    waf_mode           = "On"
+    max_body_mb        = 10
+  }
+  kidscorner = {
+    domain             = "kidscorner.yourdomain.com"
+    upstream_container = "kidscorner-app"
+    upstream_port      = 3000
+    waf_mode           = "DetectionOnly"
+    max_body_mb        = 15
+  }
+}
+
+# 1Panel configuration (leave password/entrance empty to auto-generate strong secrets)
+panel_port             = 10086
+panel_username         = "paneladmin"
+panel_password         = ""
+panel_entrance         = ""
+enable_panel_subdomain = false
+panel_domain           = ""
+
+# Optional shared Linode Managed PostgreSQL 16 cluster (host multiple isolated tenant databases on 1 cluster)
+enable_shared_managed_postgres = true
+postgres_engine_id             = "postgresql/16"
+postgres_node_type             = "g6-nanode-1"
+postgres_cluster_size          = 1

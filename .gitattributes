@@ -1,0 +1,8 @@
+# Enforce LF line endings so base64-encoded Linux cloud-init, Caddy, and bash scripts never contain CRLF on Windows
+* text=auto eol=lf
+*.sh text eol=lf
+*.tftpl text eol=lf
+*.tf text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile* text eol=lf
