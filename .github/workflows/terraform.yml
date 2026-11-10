@@ -51,7 +51,7 @@ jobs:
       TF_VAR_linode_token: ${{ secrets.LINODE_TOKEN }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_cluster_name: ${{ vars.CLUSTER_NAME || 'shared-01' }}
-      TF_VAR_acme_email: ${{ vars.ACME_EMAIL || 'devops@example.com' }}
+      TF_VAR_rlg_support_email: ${{ vars.RLG_SUPPORT_EMAIL || 'support@example.com' }}
       TF_VAR_hosted_apps: ${{ vars.HOSTED_APPS_JSON || '{}' }}
     steps:
       - uses: actions/checkout@v4
@@ -84,7 +84,7 @@ jobs:
       TF_VAR_linode_token: ${{ secrets.LINODE_TOKEN }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
       TF_VAR_cluster_name: ${{ vars.CLUSTER_NAME || 'shared-01' }}
-      TF_VAR_acme_email: ${{ vars.ACME_EMAIL || 'devops@example.com' }}
+      TF_VAR_rlg_support_email: ${{ vars.RLG_SUPPORT_EMAIL || 'support@example.com' }}
       TF_VAR_hosted_apps: ${{ vars.HOSTED_APPS_JSON || '{}' }}
     steps:
       - uses: actions/checkout@v4

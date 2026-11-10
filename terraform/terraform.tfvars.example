@@ -11,7 +11,7 @@ ssh_public_key = "ssh-ed25519 AAAA... deploy@appitect-mini"
 ssh_allowed_ipv4 = ["0.0.0.0/0"]
 ssh_allowed_ipv6 = ["::/0"]
 
-acme_email = "devops@yourdomain.com"
+rlg_support_email = "support@yourdomain.com"
 
 # Declarative registry of multiple low-usage applications hosted on this shared VPS
 hosted_apps = {

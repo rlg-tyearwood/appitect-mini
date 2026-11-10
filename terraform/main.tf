@@ -21,7 +21,7 @@ locals {
   effective_panel_slug = var.panel_entrance != "" ? var.panel_entrance : random_string.panel_entrance.result
 
   rendered_caddyfile = templatefile("${path.module}/../edge/Caddyfile.tftpl", {
-    acme_email             = var.acme_email
+    rlg_support_email      = var.rlg_support_email
     enable_panel_subdomain = var.enable_panel_subdomain
     panel_domain           = var.panel_domain
     panel_port             = var.panel_port

@@ -74,8 +74,8 @@ variable "ssh_allowed_ipv6" {
   default     = ["::/0"]
 }
 
-variable "acme_email" {
-  description = "Email address used by Caddy for Let's Encrypt ACME TLS certificate notifications across all hosted tenant domains."
+variable "rlg_support_email" {
+  description = "RLG Support Email address used by Caddy for Let's Encrypt ACME TLS certificate notifications across all hosted tenant domains."
   type        = string
 }
 
