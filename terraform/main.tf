@@ -67,11 +67,6 @@ locals {
   })
 }
 
-resource "linode_sshkey" "deploy" {
-  label   = "${local.name_prefix}-key"
-  ssh_key = chomp(trimspace(var.ssh_public_key))
-}
-
 resource "linode_instance" "vps" {
   label           = local.name_prefix
   image           = var.vps_image
@@ -80,7 +75,7 @@ resource "linode_instance" "vps" {
   backups_enabled = var.backups_enabled
   private_ip      = true
   root_pass       = random_password.root_pass.result
-  authorized_keys = [linode_sshkey.deploy.ssh_key]
+  authorized_keys = [chomp(trimspace(var.ssh_public_key))]
   tags            = ["appitect-mini", "shared-hosting", var.cluster_name, var.environment]
 
   metadata {
