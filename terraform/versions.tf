@@ -5,13 +5,13 @@ terraform {
   # Dynamic values (bucket, key, endpoints) are supplied via `terraform init -backend-config=backend.hcl`
   # locally or `-backend-config` flags in GitHub Actions.
   backend "s3" {
-    region                      = "us-east-1"
+    region                      = "us-sea-1"
     skip_credentials_validation = true
     skip_metadata_api_check     = true
     skip_region_validation      = true
     skip_requesting_account_id  = true
     skip_s3_checksum            = true
-    use_path_style              = true
+    use_path_style              = false
   }
 
   required_providers {
