@@ -65,7 +65,6 @@ output "shared_managed_postgres" {
   value = var.enable_shared_managed_postgres ? {
     id             = linode_database_postgresql_v2.shared_db[0].id
     host_primary   = linode_database_postgresql_v2.shared_db[0].host_primary
-    host_secondary = linode_database_postgresql_v2.shared_db[0].host_secondary
     port           = linode_database_postgresql_v2.shared_db[0].port
     username       = linode_database_postgresql_v2.shared_db[0].root_username
     password       = linode_database_postgresql_v2.shared_db[0].root_password
